@@ -10,15 +10,12 @@ struct LinearMotion {
 }
 
 // Define a struct to represent rotational motion
-#[derive(Debug)] 
+#[derive(Debug)]
 struct RotationalMotion {
     center: (f64, f64),
     radius: f64,
     clockwise: bool,
     stop_angle: f64,
-    i: Option<f64>,
-    j: Option<f64>,
-    k: Option<f64>,
 }
 
 // Define an enum to represent different types of motion
@@ -34,15 +31,12 @@ impl Motion {
     }
 
     // Constructor for rotational motion
-    fn new_rotational(center: (f64, f64), radius: f64, clockwise: bool, stop_angle: f64, i: Option<f64>, j: Option<f64>, k: Option<f64>) -> Self {
+    fn new_rotational(center: (f64, f64), radius: f64, clockwise: bool, stop_angle: f64) -> Self {
         Motion::Rotational(RotationalMotion {
             center,
             radius,
             clockwise,
             stop_angle,
-            i,
-            j,
-            k,
         })
     }
 }
@@ -64,10 +58,11 @@ fn read_file(file_path: &str) -> io::Result<Vec<Motion>> {
         // Split the line into parts using whitespace as delimiter
         let parts: Vec<&str> = line.trim().split_whitespace().collect();
 
-        println!("Parts: {:?}", parts); // Debug print
+        // Debug print
+        println!("Parts: {:?}", parts);
 
-        // Check if there are at least 4 parts (to avoid panics)
-        if parts.len() < 4 {
+        // Check if there are at least 3 parts (to avoid panics)
+        if parts.len() < 3 {
             println!("Invalid command format: {}", line);
             continue;
         }
@@ -85,8 +80,8 @@ fn read_file(file_path: &str) -> io::Result<Vec<Motion>> {
             prev_start = start; // Update previous start point
         } else if parts[0] == "CW" || parts[0] == "CCW" {
             println!("Found CW/CCW command");
-            // Ensure that the CW or CCW command has at least 7 parts
-            if parts.len() < 7 {
+            // Ensure that the CW or CCW command has at least 5 parts
+            if parts.len() < 5 {
                 println!("Invalid command format: {}", line);
                 continue;
             }
@@ -98,14 +93,9 @@ fn read_file(file_path: &str) -> io::Result<Vec<Motion>> {
             );
             let radius = parts[3][1..].parse().unwrap_or(0.0); // Parse radius
             let clockwise = parts[0] == "CW"; // Determine direction of rotation
-            let stop_angle = parts[6][1..].parse().unwrap_or(0.0); // Parse stop angle
-
-            // Optional I, J, K coordinates
-            let i = if parts.len() > 4 { Some(parts[4][1..].parse().unwrap_or(0.0)) } else { None };
-            let j = if parts.len() > 5 { Some(parts[5][1..].parse().unwrap_or(0.0)) } else { None };
-            let k = if parts.len() > 6 { Some(parts[6][1..].parse().unwrap_or(0.0)) } else { None };
+            let stop_angle = parts[4][1..].parse().unwrap_or(0.0); // Parse stop angle
             // Create a new rotational motion and push it to the vector
-            motions.push(Motion::new_rotational(center, radius, clockwise, stop_angle, i, j, k));
+            motions.push(Motion::new_rotational(center, radius, clockwise, stop_angle));
         } else {
             // Handle unrecognized command
             println!("Invalid command: {}", line);
@@ -157,22 +147,14 @@ fn main() {
                     }
                     // Handle rotational motion
                     Motion::Rotational(rotational_motion) => {
-                        println!("Rotational Motion: {:?}", rotational_motion); // Debug print
-                        // Calculate positions along the circular path
-                        let positions = rotational_motion_calculate(
-                            rotational_motion.center,
-                            rotational_motion.radius,
-                            rotational_motion.clockwise,
-                            rotational_motion.stop_angle,
-                            rotational_motion.i,  // Pass I coordinate
-                            rotational_motion.j,  // Pass J coordinate
-                            rotational_motion.k,  // Pass K coordinate
-                        );
-                        // Print each position
+                        println!("Rotational Motion: {:?}", rotational_motion);
+                        let positions = rotational_motion_calculate(rotational_motion.center, rotational_motion.radius, rotational_motion.clockwise, rotational_motion.stop_angle);
                         for (x, y) in positions {
                             println!("{:.2}, {:.2}", x, y);
                         }
                     }
+                    // Debug print for unmatched motion types
+                    _ => println!("Unrecognized motion type"),
                 }
             }
         }
@@ -187,45 +169,49 @@ fn linear_motion_calculate(start: (f64, f64, f64), end: (f64, f64, f64)) -> Vec<
     let (start_x, start_y, start_z) = start;
     let (end_x, end_y, end_z) = end;
 
-    println!("Start: {:?}, End: {:?}", start, end); // Debug print
+    // Calculate the maximum distance in any axis
+    let max_distance = f64::max(f64::max((end_x - start_x).abs(), (end_y - start_y).abs()), (end_z - start_z).abs());
 
-    // Calculate intermediate positions along the linear path
-    for i in 0..=100 {
-        let ratio = i as f64 / 100.0;
-        let x = start_x + ratio * (end_x - start_x);
-        let y = start_y + ratio * (end_y - start_y);
-        let z = start_z + ratio * (end_z - start_z);
+    // Calculate the number of steps based on the maximum distance
+    let steps = max_distance.ceil() as i32;
+
+    // Increment values for each axis
+    let x_increment = (end_x - start_x) / steps as f64;
+    let y_increment = (end_y - start_y) / steps as f64;
+    let z_increment = (end_z - start_z) / steps as f64;
+
+    // Initial position
+    let mut x = start_x;
+    let mut y = start_y;
+    let mut z = start_z;
+
+    // Output the linear motion in one unit increments
+    for _ in 0..=steps {
         positions.push((x, y, z));
+        x += x_increment;
+        y += y_increment;
+        z += z_increment;
     }
 
     positions
 }
 
 // Function to calculate positions along a rotational path
-fn rotational_motion_calculate(center: (f64, f64), radius: f64, clockwise: bool, stop_angle: f64, i: Option<f64>, j: Option<f64>, k: Option<f64>) -> Vec<(f64, f64)> {
+fn rotational_motion_calculate(center: (f64, f64), radius: f64, clockwise: bool, stop_angle_degrees: f64) -> Vec<(f64, f64)> {
     let mut positions = Vec::new();
     let direction = if clockwise { -1.0 } else { 1.0 };
 
-    // Normalize I, J, K coordinates to get a unit direction vector
-    let (i, j, k) = match (i, j, k) {
-        (Some(i), Some(j), Some(k)) => {
-            let magnitude = (i * i + j * j + k * k).sqrt();
-            if magnitude == 0.0 {
-                // If the magnitude is zero, choose a default direction along the X-axis
-                (1.0, 0.0, 0.0)
-            } else {
-                (i / magnitude, j / magnitude, k / magnitude)
-            }
-        }
-        _ => (1.0, 0.0, 0.0), // Default direction along the X-axis
-    };
-
+    // Convert stop angle from degrees to radians
+    let stop_angle_radians = stop_angle_degrees.to_radians();
+    
+    // Calculate the number of intervals based on 5-degree increments
+    let num_intervals = (stop_angle_degrees.abs() / 5.0).ceil() as i32;
+    
     // Calculate positions along the circular path at 5-degree intervals
-     for angle in (0..=stop_angle as i32).step_by(5) {
-        let radians = (angle as f64).to_radians();
-        let x = center.0 + radius * radians.cos();
-        let y = center.1 + radius * radians.sin();
-        println!("Angle: {}, X: {:.2}, Y: {:.2}", angle, x, y); // Debug print
+    for interval in 0..=num_intervals {
+        let angle = (interval as f64 * 5.0).to_radians(); // Convert interval to radians
+        let x = center.0 + radius * angle.cos();
+        let y = center.1 + radius * angle.sin();
         positions.push((x, y));
     }
 
