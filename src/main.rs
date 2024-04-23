@@ -15,7 +15,7 @@ struct RotationalMotion {
     center: (f64, f64),
     radius: f64,
     clockwise: bool,
-    stop_angle: f64,
+    stop_angle: f64, // Added stop_angle field
 }
 
 // Define an enum to represent different types of motion
@@ -36,7 +36,7 @@ impl Motion {
             center,
             radius,
             clockwise,
-            stop_angle,
+            stop_angle, // Added stop_angle initialization
         })
     }
 }
@@ -58,9 +58,6 @@ fn read_file(file_path: &str) -> io::Result<Vec<Motion>> {
         // Split the line into parts using whitespace as delimiter
         let parts: Vec<&str> = line.trim().split_whitespace().collect();
 
-        // Debug print
-        println!("Parts: {:?}", parts);
-
         // Check if there are at least 3 parts (to avoid panics)
         if parts.len() < 3 {
             println!("Invalid command format: {}", line);
@@ -69,7 +66,6 @@ fn read_file(file_path: &str) -> io::Result<Vec<Motion>> {
 
         // Check if the command is "LIN"
         if parts[0] == "LIN" {
-            println!("Found LIN command");
             // Parse start and end points from the parts
             let start = (
                 parts[1][1..].parse().unwrap_or(0.0), // Parse X coordinate
@@ -79,7 +75,6 @@ fn read_file(file_path: &str) -> io::Result<Vec<Motion>> {
             motions.push(Motion::new_linear(prev_start, start)); // Use previous start point as end point
             prev_start = start; // Update previous start point
         } else if parts[0] == "CW" || parts[0] == "CCW" {
-            println!("Found CW/CCW command");
             // Ensure that the CW or CCW command has at least 5 parts
             if parts.len() < 5 {
                 println!("Invalid command format: {}", line);
@@ -92,10 +87,9 @@ fn read_file(file_path: &str) -> io::Result<Vec<Motion>> {
                 parts[2][1..].parse().unwrap_or(0.0), // Parse Y coordinate
             );
             let radius = parts[3][1..].parse().unwrap_or(0.0); // Parse radius
-            let clockwise = parts[0] == "CW"; // Determine direction of rotation
             let stop_angle = parts[4][1..].parse().unwrap_or(0.0); // Parse stop angle
             // Create a new rotational motion and push it to the vector
-            motions.push(Motion::new_rotational(center, radius, clockwise, stop_angle));
+            motions.push(Motion::new_rotational(center, radius, parts[0] == "CW", stop_angle));
         } else {
             // Handle unrecognized command
             println!("Invalid command: {}", line);
@@ -148,71 +142,67 @@ fn main() {
                     // Handle rotational motion
                     Motion::Rotational(rotational_motion) => {
                         println!("Rotational Motion: {:?}", rotational_motion);
-                        let positions = rotational_motion_calculate(rotational_motion.center, rotational_motion.radius, rotational_motion.clockwise, rotational_motion.stop_angle);
+                        let positions = rotational_motion_calculate(rotational_motion);
                         for (x, y) in positions {
                             println!("{:.2}, {:.2}", x, y);
                         }
                     }
-                    // Debug print for unmatched motion types
-                    _ => println!("Unrecognized motion type"),
                 }
             }
         }
-        // Handle file read error
         Err(e) => println!("Error reading file: {}", e),
     }
 }
 
-// Function to calculate positions along a linear path
+// Function to calculate positions for linear motion
 fn linear_motion_calculate(start: (f64, f64, f64), end: (f64, f64, f64)) -> Vec<(f64, f64, f64)> {
+    // Calculate the total change in each dimension
+    let dx = end.0 - start.0;
+    let dy = end.1 - start.1;
+    let dz = end.2 - start.2;
+
+    // Determine the number of steps based on the change in the y dimension
+    let num_steps = dy.abs().ceil() as usize;
+
+    // Generate positions for each step
     let mut positions = Vec::new();
-    let (start_x, start_y, start_z) = start;
-    let (end_x, end_y, end_z) = end;
-
-    // Calculate the maximum distance in any axis
-    let max_distance = f64::max(f64::max((end_x - start_x).abs(), (end_y - start_y).abs()), (end_z - start_z).abs());
-
-    // Calculate the number of steps based on the maximum distance
-    let steps = max_distance.ceil() as i32;
-
-    // Increment values for each axis
-    let x_increment = (end_x - start_x) / steps as f64;
-    let y_increment = (end_y - start_y) / steps as f64;
-    let z_increment = (end_z - start_z) / steps as f64;
-
-    // Initial position
-    let mut x = start_x;
-    let mut y = start_y;
-    let mut z = start_z;
-
-    // Output the linear motion in one unit increments
-    for _ in 0..=steps {
+    for i in 0..=num_steps {
+        let t = i as f64 / num_steps as f64;
+        let x = start.0 + dx * t;
+        let y = start.1 + dy * t;
+        let z = start.2 + dz * t;
         positions.push((x, y, z));
-        x += x_increment;
-        y += y_increment;
-        z += z_increment;
     }
 
     positions
 }
 
-// Function to calculate positions along a rotational path
-fn rotational_motion_calculate(center: (f64, f64), radius: f64, clockwise: bool, stop_angle_degrees: f64) -> Vec<(f64, f64)> {
-    let mut positions = Vec::new();
-    let direction = if clockwise { -1.0 } else { 1.0 };
 
-    // Convert stop angle from degrees to radians
-    let stop_angle_radians = stop_angle_degrees.to_radians();
-    
-    // Calculate the number of intervals based on 5-degree increments
-    let num_intervals = (stop_angle_degrees.abs() / 5.0).ceil() as i32;
-    
-    // Calculate positions along the circular path at 5-degree intervals
-    for interval in 0..=num_intervals {
-        let angle = (interval as f64 * 5.0).to_radians(); // Convert interval to radians
-        let x = center.0 + radius * angle.cos();
-        let y = center.1 + radius * angle.sin();
+
+// Function to calculate positions for rotational motion
+fn rotational_motion_calculate(rotational_motion: RotationalMotion) -> Vec<(f64, f64)> {
+    // Define constants for full circle and degree to radian conversion
+    const FULL_CIRCLE: f64 = std::f64::consts::PI * 2.0;
+    const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
+
+    // Determine the step angle based on the radius
+    let step_angle = 5.0 / rotational_motion.radius;
+
+    // Calculate the start and end angles based on the direction of rotation
+    let (start_angle, end_angle) = if rotational_motion.clockwise {
+        (0.0, rotational_motion.stop_angle)
+    } else {
+        (FULL_CIRCLE, FULL_CIRCLE - rotational_motion.stop_angle)
+    };
+
+    // Generate positions at 5-degree intervals
+    let mut positions = Vec::new();
+    let mut angle = start_angle;
+    while angle <= end_angle {
+        let x = rotational_motion.center.0 + rotational_motion.radius * angle.cos();
+        let y = rotational_motion.center.1 + rotational_motion.radius * angle.sin();
         positions.push((x, y));
+        angle += DEG_TO_RAD * step_angle;
     }
 
     positions
