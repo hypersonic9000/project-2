@@ -134,14 +134,16 @@ fn main() {
                     // Handle linear motion
                     Motion::Linear(linear_motion) => {
                         println!("LIN {:?} to {:?}", linear_motion.start, linear_motion.end);
+                        // Calculate and print the positions for linear motion
                         let positions = linear_motion_calculate(linear_motion.start, linear_motion.end);
-                        for (x, y, z) in positions {
-                            println!("{:.2}, {:.2}, {:.2}", x, y, z);
+                        for position in positions {
+                            println!("{}", position);
                         }
                     }
                     // Handle rotational motion
                     Motion::Rotational(rotational_motion) => {
                         println!("Rotational Motion: {:?}", rotational_motion);
+                        // Calculate and print the positions for rotational motion
                         let positions = rotational_motion_calculate(rotational_motion);
                         for (x, y) in positions {
                             println!("{:.2}, {:.2}", x, y);
@@ -154,30 +156,41 @@ fn main() {
     }
 }
 
+
 // Function to calculate positions for linear motion
-fn linear_motion_calculate(start: (f64, f64, f64), end: (f64, f64, f64)) -> Vec<(f64, f64, f64)> {
+fn linear_motion_calculate(start: (f64, f64, f64), end: (f64, f64, f64)) -> Vec<String> {
     // Calculate the total change in each dimension
     let dx = end.0 - start.0;
     let dy = end.1 - start.1;
     let dz = end.2 - start.2;
 
-    // Determine the number of steps based on the change in the y dimension
-    let num_steps = dy.abs().ceil() as usize;
+    // Determine the maximum magnitude of change
+    let max_delta = dx.abs().max(dy.abs()).max(dz.abs());
+
+    // Determine the number of steps
+    let num_steps = (max_delta.abs() + 1.0).ceil() as usize;
+
+    // Print the delta steps for debugging
+    println!("Delta steps: dx={}, dy={}, dz={}", dx, dy, dz);
+    // Print the number of steps for debugging
+    println!("Number of steps: {}", num_steps);
+
+    // Calculate step increments for each dimension
+    let dx_step = if num_steps != 0 { dx / num_steps as f64 } else { 0.0 };
+    let dy_step = if num_steps != 0 { dy / num_steps as f64 } else { 0.0 };
+    let dz_step = if num_steps != 0 { dz / num_steps as f64 } else { 0.0 };
 
     // Generate positions for each step
     let mut positions = Vec::new();
-    for i in 0..=num_steps {
-        let t = i as f64 / num_steps as f64;
-        let x = start.0 + dx * t;
-        let y = start.1 + dy * t;
-        let z = start.2 + dz * t;
-        positions.push((x, y, z));
+    for i in 1..=num_steps {
+        let x = start.0 + dx_step * i as f64;
+        let y = start.1 + dy_step * i as f64;
+        let z = start.2 + dz_step * i as f64;
+        positions.push(format!("{:.2}, {:.2}, {:.2}", x, y, z));
     }
 
     positions
 }
-
-
 
 // Function to calculate positions for rotational motion
 fn rotational_motion_calculate(rotational_motion: RotationalMotion) -> Vec<(f64, f64)> {
