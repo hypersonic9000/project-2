@@ -41,7 +41,20 @@ impl Motion {
     }
 }
 
-// Function to read motions from a file
+/// Function to read motions from a file
+///
+/// This function reads motions from a file specified by the given file path.
+/// The file should contain commands in the following format:
+/// - "LIN (x1, y1, z1) to (x2, y2, z2)" for linear motion
+/// - "CW (x, y) radius r stop_angle a" or "CCW (x, y) radius r stop_angle a" for rotational motion
+///
+/// # Arguments
+///
+/// * `file_path` - The path to the file containing motion commands
+///
+/// # Returns
+///
+/// A Result containing a vector of Motion enums if successful, or an IO error otherwise.
 fn read_file(file_path: &str) -> io::Result<Vec<Motion>> {
     // Open the file
     let file = File::open(file_path)?;
@@ -157,7 +170,20 @@ fn main() {
 }
 
 
-// Function to calculate positions for linear motion
+/// Function to calculate positions for linear motion
+///
+/// Given a start position and an end position, this function calculates
+/// intermediate positions in a straight line between the start and end points.
+/// The positions are calculated with one-unit increments.
+///
+/// # Arguments
+///
+/// * `start` - The starting position (x, y, z)
+/// * `end` - The ending position (x, y, z)
+///
+/// # Returns
+///
+/// A vector of strings containing the calculated positions.
 fn linear_motion_calculate(start: (f64, f64, f64), end: (f64, f64, f64)) -> Vec<String> {
     // Calculate the total change in each dimension
     let dx = end.0 - start.0;
@@ -192,7 +218,19 @@ fn linear_motion_calculate(start: (f64, f64, f64), end: (f64, f64, f64)) -> Vec<
     positions
 }
 
-// Function to calculate positions for rotational motion
+/// Function to calculate positions for rotational motion
+///
+/// Given the parameters of a rotational motion (center, radius, clockwise,
+/// stop angle), this function calculates the positions along the arc of the
+/// rotation. Positions are calculated at 5-degree intervals.
+///
+/// # Arguments
+///
+/// * `rotational_motion` - A struct containing the parameters of the rotational motion.
+///
+/// # Returns
+///
+/// A vector of tuples containing the calculated (x, y) positions.
 fn rotational_motion_calculate(rotational_motion: RotationalMotion) -> Vec<(f64, f64)> {
     // Define constants for full circle and degree to radian conversion
     const FULL_CIRCLE: f64 = std::f64::consts::PI * 2.0;
@@ -219,4 +257,49 @@ fn rotational_motion_calculate(rotational_motion: RotationalMotion) -> Vec<(f64,
     }
 
     positions
+}
+
+#[cfg(test)]
+mod tests {
+    // Import necessary items from the parent module
+    use super::*;
+
+    /// Test the `linear_motion_calculate` function.
+    #[test]
+    fn test_linear_motion_calculate() {
+        // Test linear motion calculation function
+        let start = (0.0, 0.0, 0.0);
+        let end = (3.0, 4.0, 5.0);
+        let positions = linear_motion_calculate(start, end);
+        assert_eq!(positions.len(), 7); // Adjusted for inclusive start and end points
+        assert_eq!(positions[0], "0.00, 0.00, 0.00"); // Adjusted start position
+        assert_eq!(positions[6], "3.00, 4.00, 5.00"); // Check last position
+    }
+
+    /// Test the `rotational_motion_calculate` function.
+    #[test]
+    fn test_rotational_motion_calculate() {
+        // Test rotational motion calculation function
+        let rotational_motion = RotationalMotion {
+            center: (0.0, 0.0),
+            radius: 5.0,
+            clockwise: true,
+            stop_angle: 90.0,
+        };
+        let positions = rotational_motion_calculate(rotational_motion);
+        assert_eq!(positions.len(), 21); // Adjusted expected number of positions
+        assert_eq!(positions[0], (5.00, 0.00)); // Check first position
+        assert_eq!(positions[20], (0.00, 5.00)); // Check last position
+    }
+
+   /// Test the `read_file` function.
+#[test]
+fn test_read_file() {
+    // Test reading motions from a file
+    let result = read_file("test.cmmd");
+    assert!(result.is_ok()); // Check if reading succeeds
+    let motions = result.unwrap();
+    assert_eq!(motions.len(), 8); // Check number of motions read
+    // Add more specific checks if needed
+    }
 }
