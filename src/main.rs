@@ -55,6 +55,20 @@ impl Motion {
 /// # Returns
 ///
 /// A Result containing a vector of Motion enums if successful, or an IO error otherwise.
+///
+/// # Errors
+///
+/// This function can return an IO error if it fails to open or read from the file.
+///
+/// # Examples
+///
+/// ```
+/// let result = read_file("test.cmmd");
+/// assert!(result.is_ok()); // Check if reading succeeds
+/// let motions = result.unwrap();
+/// assert_eq!(motions.len(), 8); // Check number of motions read
+/// // Add more specific checks if needed
+/// ```
 fn read_file(file_path: &str) -> io::Result<Vec<Motion>> {
     // Open the file
     let file = File::open(file_path)?;
@@ -184,6 +198,17 @@ fn main() {
 /// # Returns
 ///
 /// A vector of strings containing the calculated positions.
+///
+/// # Examples
+///
+/// ```
+/// let start = (0.0, 0.0, 0.0);
+/// let end = (3.0, 4.0, 5.0);
+/// let positions = linear_motion_calculate(start, end);
+/// assert_eq!(positions.len(), 7); // Adjusted for inclusive start and end points
+/// assert_eq!(positions[0], "0.00, 0.00, 0.00"); // Adjusted start position
+/// assert_eq!(positions[6], "3.00, 4.00, 5.00"); // Check last position
+/// ```
 fn linear_motion_calculate(start: (f64, f64, f64), end: (f64, f64, f64)) -> Vec<String> {
     // Calculate the total change in each dimension
     let dx = end.0 - start.0;
@@ -231,6 +256,21 @@ fn linear_motion_calculate(start: (f64, f64, f64), end: (f64, f64, f64)) -> Vec<
 /// # Returns
 ///
 /// A vector of tuples containing the calculated (x, y) positions.
+///
+/// # Examples
+///
+/// ```
+/// let rotational_motion = RotationalMotion {
+///     center: (0.0, 0.0),
+///     radius: 5.0,
+///     clockwise: true,
+///     stop_angle: 90.0,
+/// };
+/// let positions = rotational_motion_calculate(rotational_motion);
+/// assert_eq!(positions.len(), 21); // Adjusted expected number of positions
+/// assert_eq!(positions[0], (5.00, 0.00)); // Check first position
+/// assert_eq!(positions[20], (0.00, 5.00)); // Check last position
+/// ```
 fn rotational_motion_calculate(rotational_motion: RotationalMotion) -> Vec<(f64, f64)> {
     // Define constants for full circle and degree to radian conversion
     const FULL_CIRCLE: f64 = std::f64::consts::PI * 2.0;
